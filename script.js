@@ -67,39 +67,76 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-// Mock Remote API
-const API = {
-    // In a real app, fetch from https://api.yourserver.com/scores
-    getScores: async () => {
-        // Simulate network delay
-        return new Promise(resolve => {
-            setTimeout(() => {
-                const data = localStorage.getItem('sheep_scores');
-                resolve(data ? JSON.parse(data) : []);
-            }, 500);
+// Initialize LeanCloud (Replace with your own App ID and Key from https://console.leancloud.app/)
+// 这是一个示例 ID，请务必替换为您自己的 LeanCloud AppID 和 AppKey，否则无法存储数据！
+const APP_ID = 'CTFB2aOWEWOfM7sw4AI4vQwt-MdYXbMMI';
+const APP_KEY = '4zlzhUaDbnMIUTGxIDdYvN4m';
+
+try {
+    if (typeof AV !== 'undefined') {
+        AV.init({
+            appId: APP_ID,
+            appKey: APP_KEY,
+            serverURL: "https://your-custom-domain.com" // 如果是国际版或已绑定域名，请填入；否则国内版需绑定域名
         });
+    }
+} catch (e) {
+    console.error("LeanCloud init failed:", e);
+}
+
+// Remote API using LeanCloud
+const API = {
+    getScores: async () => {
+        if (typeof AV === 'undefined') return JSON.parse(localStorage.getItem('sheep_scores') || '[]');
+        try {
+            const query = new AV.Query('Score');
+            query.descending('level');
+            query.limit(50);
+            const results = await query.find();
+            return results.map(r => ({
+                name: r.get('name'),
+                level: r.get('level')
+            }));
+        } catch (error) {
+            console.warn('Fetch scores failed, using local:', error);
+            return JSON.parse(localStorage.getItem('sheep_scores') || '[]');
+        }
     },
     submitScore: async (name, level) => {
-        // Simulate network delay
-        return new Promise(resolve => {
-            setTimeout(() => {
-                let scores = JSON.parse(localStorage.getItem('sheep_scores') || '[]');
-                // Check if user exists
-                const idx = scores.findIndex(s => s.name === name);
-                if (idx !== -1) {
-                    if (level > scores[idx].level) {
-                        scores[idx].level = level;
-                        scores[idx].time = Date.now();
-                    }
-                } else {
-                    scores.push({ name, level, time: Date.now() });
+        // Save locally first as backup
+        let localScores = JSON.parse(localStorage.getItem('sheep_scores') || '[]');
+        const idx = localScores.findIndex(s => s.name === name);
+        if (idx !== -1) {
+            if (level > localScores[idx].level) localScores[idx].level = level;
+        } else {
+            localScores.push({ name, level, time: Date.now() });
+        }
+        localStorage.setItem('sheep_scores', JSON.stringify(localScores));
+
+        if (typeof AV === 'undefined') return;
+        
+        try {
+            // Check if user exists on cloud
+            const query = new AV.Query('Score');
+            query.equalTo('name', name);
+            const results = await query.find();
+            
+            if (results.length > 0) {
+                const record = results[0];
+                if (level > record.get('level')) {
+                    record.set('level', level);
+                    await record.save();
                 }
-                // Sort by level desc
-                scores.sort((a, b) => b.level - a.level);
-                localStorage.setItem('sheep_scores', JSON.stringify(scores));
-                resolve(true);
-            }, 300);
-        });
+            } else {
+                const Score = AV.Object.extend('Score');
+                const score = new Score();
+                score.set('name', name);
+                score.set('level', level);
+                await score.save();
+            }
+        } catch (error) {
+            console.warn('Upload score failed:', error);
+        }
     }
 };
 
@@ -149,11 +186,13 @@ function generateTiles(level) {
         numTypes = 3;
         numSets = 7; // 21 tiles
     } else if (level === 2) {
+        // Reduced difficulty significantly
         numTypes = 6;
-        numSets = 20; // 60 tiles
+        numSets = 12; // 36 tiles (was 60)
     } else {
-        numTypes = Math.min(EMOJIS.length, 5 + level);
-        numSets = 20 + (level - 2) * 5;
+        // Gradual increase
+        numTypes = Math.min(EMOJIS.length, 6 + Math.floor((level - 2) / 2));
+        numSets = 15 + (level - 2) * 3;
     }
 
     const selectedTypes = EMOJIS.slice(0, numTypes);
@@ -315,42 +354,53 @@ function onTileClick(id) {
     // 2. Keep element on board but change to fixed/absolute
     const startRect = tileObj.el.getBoundingClientRect();
     
-    // Clone the node for flying to avoid messing up the board structure instantly?
-    // No, simpler to just move the real node.
-    // But we need to remove it from board flow first? It is absolute already.
-    
     tileObj.el.style.position = 'fixed';
     tileObj.el.style.left = `${startRect.left}px`;
     tileObj.el.style.top = `${startRect.top}px`;
     tileObj.el.style.zIndex = 2000;
     tileObj.el.classList.add('flying-tile');
-    // Remove from board visually (it's fixed now)
-    // Note: We already filtered boardTiles, so logic is fine.
-
+    
     // 3. Trigger move
-    // Use a slight delay to ensure browser registered the 'fixed' change
+    // Double RAF to ensure style application
     requestAnimationFrame(() => {
-        tileObj.el.style.left = `${targetRect.left}px`;
-        tileObj.el.style.top = `${targetRect.top}px`;
-        tileObj.el.style.transform = 'scale(1)';
+        requestAnimationFrame(() => {
+            tileObj.el.style.left = `${targetRect.left}px`;
+            tileObj.el.style.top = `${targetRect.top}px`;
+            tileObj.el.style.transform = 'scale(1)';
+        });
     });
 
-    // 4. After transition, place in dock REAL DOM
-    setTimeout(() => {
-        // Replace placeholder with real element
-        placeholder.replaceWith(tileObj.el);
+    // 4. Handle Transition End cleanly
+    const onTransitionEnd = () => {
+        tileObj.el.removeEventListener('transitionend', onTransitionEnd);
         
-        // Reset styles for dock
-        tileObj.el.style.position = 'relative';
-        tileObj.el.style.left = 'auto';
-        tileObj.el.style.top = 'auto';
-        tileObj.el.style.zIndex = 'auto';
-        tileObj.el.style.transform = 'none';
+        // Final Check: Replace placeholder
+        if (placeholder.parentNode) {
+            placeholder.replaceWith(tileObj.el);
+        }
+        
+        // Reset styles to match static flow in dock
+        Object.assign(tileObj.el.style, {
+            position: '',
+            left: '',
+            top: '',
+            zIndex: '',
+            transform: '',
+            transition: ''
+        });
+        
         tileObj.el.classList.remove('flying-tile', 'disabled');
         
         isAnimating = false;
         checkMatch();
-    }, 400);
+    };
+
+    tileObj.el.addEventListener('transitionend', onTransitionEnd);
+    
+    // Fallback in case event doesn't fire
+    setTimeout(() => {
+        if (isAnimating) onTransitionEnd();
+    }, 500);
 }
 
 // Removed renderDock entirely to prevent flickering
@@ -364,37 +414,41 @@ function checkMatch() {
     
     if (typeToRemove) {
         isAnimating = true;
-        // Wait a beat
+        
+        // Short delay to let the user see the 3rd tile land
         setTimeout(() => {
-            // Identify tiles to remove
             const toRemove = dockTiles.filter(t => t.type === typeToRemove).slice(0, 3);
             
-            // Add exit animation
+            // 1. Visual Highlight/Combo effect
             toRemove.forEach(t => {
-                t.el.classList.add('poof-anim');
-                // Optional: scale down
-                t.el.style.transform = 'scale(0)';
-                t.el.style.transition = 'transform 0.3s';
+                t.el.classList.add('match-anim');
             });
 
+            // 2. Wait for animation then remove
             setTimeout(() => {
-                // Remove from DOM and Array
-                toRemove.forEach(t => t.el.remove());
-                
-                // Update array
-                let removedCount = 0;
-                dockTiles = dockTiles.filter(t => {
-                    if (t.type === typeToRemove && removedCount < 3) {
-                        removedCount++;
-                        return false;
-                    }
-                    return true;
+                toRemove.forEach(t => {
+                    t.el.style.opacity = '0';
+                    t.el.style.transform = 'scale(0)';
                 });
-                
-                isAnimating = false;
-                checkWinLose();
-            }, 300);
-        }, 200);
+
+                setTimeout(() => {
+                    toRemove.forEach(t => t.el.remove());
+                    
+                    // Update array logic
+                    let removedCount = 0;
+                    dockTiles = dockTiles.filter(t => {
+                        if (t.type === typeToRemove && removedCount < 3) {
+                            removedCount++;
+                            return false;
+                        }
+                        return true;
+                    });
+                    
+                    isAnimating = false;
+                    checkWinLose();
+                }, 200); // Matches CSS transition time
+            }, 300); // Wait for 'match-anim' highlight
+        }, 150);
     } else {
         checkWinLose();
     }
