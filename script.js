@@ -64,8 +64,22 @@ function toggleMusic() {
     }
 }
 
+// Background Colors per Level
+const BG_GRADIENTS = [
+    'linear-gradient(180deg, #a1c4fd 0%, #c2e9fb 100%)', // Lv1 Blue
+    'linear-gradient(180deg, #d4fc79 0%, #96e6a1 100%)', // Lv2 Green
+    'linear-gradient(180deg, #ff9a9e 0%, #fecfef 99%, #fecfef 100%)', // Lv3 Pink
+    'linear-gradient(180deg, #fbc2eb 0%, #a6c1ee 100%)', // Lv4 Purple
+    'linear-gradient(180deg, #84fab0 0%, #8fd3f4 100%)', // Lv5 Cyan
+];
+
+let maxLevel = parseInt(localStorage.getItem('sheep_max_level') || '1');
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
+    // Update Max Score UI
+    document.getElementById('max-level-display').innerText = maxLevel;
+
     // Audio setup
     audio.bgm = document.getElementById('bgm');
     audio.click = document.getElementById('sfx-click');
@@ -217,6 +231,18 @@ async function showRank() {
 function startLevel(level) {
     currentLevel = level;
     levelDisplay.innerText = `第 ${level} 关`;
+    
+    // Update Max Score
+    if (level > maxLevel) {
+        maxLevel = level;
+        localStorage.setItem('sheep_max_level', maxLevel);
+        document.getElementById('max-level-display').innerText = maxLevel;
+    }
+
+    // Update Background
+    const bgIndex = (level - 1) % BG_GRADIENTS.length;
+    document.body.style.background = BG_GRADIENTS[bgIndex];
+
     boardTiles = [];
     dockTiles = [];
     boardEl.innerHTML = '';
@@ -358,9 +384,17 @@ function onTileClick(id) {
     if (dockTiles.length >= DOCK_CAPACITY) return;
 
     playSound('click');
+    
+    // Prevent accidental double clicks
+    tileObj.disabled = true; 
+    tileObj.el.classList.add('disabled'); // Visual feedback immediately
 
     // Logic: Remove from board
     boardTiles = boardTiles.filter(t => t.id !== id);
+    // Don't update other tile states yet to prevent them from becoming clickable during animation
+    // updateTileStates(); 
+    // Wait until animation finishes? No, user can click others.
+    // Actually, standard game allows clicking others.
     updateTileStates();
 
     // Determine insert position in dock
@@ -423,25 +457,24 @@ function onTileClick(id) {
 
     // 4. Handle Transition End
     const onTransitionEnd = () => {
+        // Ensure this only runs once
         tileObj.el.removeEventListener('transitionend', onTransitionEnd);
         
-        // Replace placeholder with real element
+        // CRITICAL: Replace placeholder immediately before style reset to prevent flickering
         if (placeholder.parentNode) {
             placeholder.replaceWith(tileObj.el);
         }
         
+        // Force reflow to ensure browser acknowledges the DOM change before style reset
+        // void tileObj.el.offsetWidth; 
+
         // Reset styles to become a normal flex item
-        Object.assign(tileObj.el.style, {
-            position: '',
-            left: '',
-            top: '',
-            zIndex: '',
-            transform: '',
-            transition: '',
-            margin: ''
-        });
-        
+        // We use style.cssText to wipe all inline styles (transform, left, top, position) at once
+        tileObj.el.style.cssText = ''; 
         tileObj.el.classList.remove('flying-tile', 'disabled');
+        tileObj.el.classList.add('tile'); // Ensure basic class remains
+        
+        // Manually restore cursor if needed (though CSS handles it)
         
         isAnimating = false;
         checkMatch();
@@ -449,13 +482,12 @@ function onTileClick(id) {
 
     tileObj.el.addEventListener('transitionend', onTransitionEnd);
     
-    // Safety fallback
+    // Safety fallback increased slightly
     setTimeout(() => {
         if (isAnimating && tileObj.el.parentElement === document.body) {
-             // If somehow stuck in fixed mode (rare)
              onTransitionEnd();
         }
-    }, 500);
+    }, 600);
 }
 
 // Removed renderDock entirely to prevent flickering
