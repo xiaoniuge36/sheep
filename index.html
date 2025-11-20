@@ -19,25 +19,44 @@
             <h1>🐑 羊了个羊 🐑</h1>
             <div class="status-bar">
                 <span id="level-display">第 1 关</span>
-                <div class="header-controls">
-                    <button id="rank-btn" class="icon-btn" title="排行榜">🏆</button>
-                    <button id="restart-btn" class="restart-btn">
-                        <span class="btn-icon">🔄</span> 重来
+                <div class=\"header-controls\">
+                    <button id=\"music-btn\" class=\"icon-btn\" title=\"开关音乐\">🎵</button>
+                    <button id=\"rank-btn\" class=\"icon-btn\" title=\"排行榜\">🏆</button>
+                    <button id=\"restart-btn\" class=\"restart-btn\">
+                        <span class=\"btn-icon\">🔄</span> 重来
                     </button>
                 </div>
             </div>
         </header>
         
-        <div id="game-board" class="board">
+        <div id=\"game-board\" class=\"board\">
             <!-- Tiles will be generated here -->
         </div>
 
-        <div class="dock-container">
-            <div id="dock" class="dock">
+        <div class=\"dock-container\">
+            <div id=\"dock\" class=\"dock\">
                 <!-- Selected tiles go here -->
             </div>
         </div>
     </div>
+
+    <!-- Audio Elements -->
+    <audio id=\"bgm\" loop>
+        <source src=\"https://freesound.org/data/previews/384/384921_7373403-lq.mp3\" type=\"audio/mpeg\">
+        <!-- Fallback or replace with local bgm.mp3 -->
+    </audio>
+    <audio id=\"sfx-click\">
+        <source src=\"https://freesound.org/data/previews/614/614379_11796409-lq.mp3\" type=\"audio/mpeg\">
+    </audio>
+    <audio id=\"sfx-match\">
+        <source src=\"https://freesound.org/data/previews/131/131660_2398403-lq.mp3\" type=\"audio/mpeg\">
+    </audio>
+    <audio id=\"sfx-win\">
+        <source src=\"https://freesound.org/data/previews/270/270404_5123851-lq.mp3\" type=\"audio/mpeg\">
+    </audio>
+    <audio id=\"sfx-lose\">
+        <source src=\"https://freesound.org/data/previews/76/76376_877451-lq.mp3\" type=\"audio/mpeg\">
+    </audio>
 
     <!-- Login Modal -->
     <div id="login-modal" class="modal">

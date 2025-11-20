@@ -32,8 +32,51 @@ const rankList = document.getElementById('rank-list');
 
 let username = localStorage.getItem('sheep_username');
 
+// Sound Management
+const audio = {
+    bgm: document.getElementById('bgm'),
+    click: document.getElementById('sfx-click'),
+    match: document.getElementById('sfx-match'),
+    win: document.getElementById('sfx-win'),
+    lose: document.getElementById('sfx-lose'),
+    muted: false
+};
+
+function playSound(name) {
+    if (audio.muted) return;
+    if (audio[name]) {
+        audio[name].currentTime = 0;
+        audio[name].play().catch(() => {}); // Ignore interaction errors
+    }
+}
+
+function toggleMusic() {
+    audio.muted = !audio.muted;
+    const btn = document.getElementById('music-btn');
+    if (audio.muted) {
+        audio.bgm.pause();
+        btn.textContent = '🔇';
+        btn.classList.add('muted');
+    } else {
+        audio.bgm.play().catch(() => {});
+        btn.textContent = '🎵';
+        btn.classList.remove('muted');
+    }
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
+    // Audio setup
+    audio.bgm.volume = 0.3;
+    document.getElementById('music-btn').addEventListener('click', toggleMusic);
+    
+    // Try auto-play BGM on first interaction
+    document.body.addEventListener('click', () => {
+        if (!audio.muted && audio.bgm.paused) {
+            audio.bgm.play().catch(() => {});
+        }
+    }, { once: true });
+
     if (!username) {
         loginModal.classList.remove('hidden');
     } else {
@@ -77,7 +120,7 @@ try {
         AV.init({
             appId: APP_ID,
             appKey: APP_KEY,
-            serverURL: "https://your-custom-domain.com" // 如果是国际版或已绑定域名，请填入；否则国内版需绑定域名
+            serverURL: "https://ctfb2aow.api.lncldglobal.com" // 如果是国际版或已绑定域名，请填入；否则国内版需绑定域名
         });
     }
 } catch (e) {
@@ -255,7 +298,10 @@ function generateTiles(level) {
         tile.dataset.id = index;
         tile.dataset.type = type;
         
-        tile.addEventListener('click', () => onTileClick(index));
+        tile.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent body click BGM trigger interfering logic
+            onTileClick(index);
+        });
         
         boardEl.appendChild(tile);
         
@@ -304,6 +350,8 @@ function onTileClick(id) {
 
     if (dockTiles.length >= DOCK_CAPACITY) return;
 
+    playSound('click');
+
     // Logic: Remove from board
     boardTiles = boardTiles.filter(t => t.id !== id);
     updateTileStates();
@@ -328,65 +376,62 @@ function onTileClick(id) {
     // Animation: Fly to dock
     isAnimating = true;
     
-    // Calculate target screen position
-    // We need to know where the slot IS visually.
-    // Since we are inserting, the positions of subsequent items will shift.
-    // We can simulate the new layout to get the target rect.
-    
-    // 1. Create a placeholder in the DOM at the target index
+    // 1. Create placeholder
     const placeholder = document.createElement('div');
     placeholder.style.width = `${TILE_SIZE}px`;
     placeholder.style.height = `${TILE_SIZE}px`;
-    placeholder.style.margin = '0'; // Controlled by flex gap in CSS
+    placeholder.style.margin = '0'; 
     placeholder.style.visibility = 'hidden';
+    placeholder.style.flexShrink = '0'; // Ensure it takes space
     
-    // Insert placeholder at correct DOM position
     if (insertIndex < dockEl.children.length) {
         dockEl.insertBefore(placeholder, dockEl.children[insertIndex]);
     } else {
         dockEl.appendChild(placeholder);
     }
     
-    // Force layout to get coordinates
+    // Force layout
     const targetRect = placeholder.getBoundingClientRect();
-    
-    // Apply FLIP-like animation
-    // 2. Keep element on board but change to fixed/absolute
     const startRect = tileObj.el.getBoundingClientRect();
     
+    // 2. Set up FLIP animation using Transform
+    // Move element to fixed overlay position identical to start
     tileObj.el.style.position = 'fixed';
     tileObj.el.style.left = `${startRect.left}px`;
     tileObj.el.style.top = `${startRect.top}px`;
+    tileObj.el.style.margin = '0';
     tileObj.el.style.zIndex = 2000;
     tileObj.el.classList.add('flying-tile');
-    
-    // 3. Trigger move
-    // Double RAF to ensure style application
+
+    // Calculate delta for transform
+    const deltaX = targetRect.left - startRect.left;
+    const deltaY = targetRect.top - startRect.top;
+
+    // 3. Trigger animation
     requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-            tileObj.el.style.left = `${targetRect.left}px`;
-            tileObj.el.style.top = `${targetRect.top}px`;
-            tileObj.el.style.transform = 'scale(1)';
-        });
+        // Apply transform
+        tileObj.el.style.transition = 'transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1)';
+        tileObj.el.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
     });
 
-    // 4. Handle Transition End cleanly
+    // 4. Handle Transition End
     const onTransitionEnd = () => {
         tileObj.el.removeEventListener('transitionend', onTransitionEnd);
         
-        // Final Check: Replace placeholder
+        // Replace placeholder with real element
         if (placeholder.parentNode) {
             placeholder.replaceWith(tileObj.el);
         }
         
-        // Reset styles to match static flow in dock
+        // Reset styles to become a normal flex item
         Object.assign(tileObj.el.style, {
             position: '',
             left: '',
             top: '',
             zIndex: '',
             transform: '',
-            transition: ''
+            transition: '',
+            margin: ''
         });
         
         tileObj.el.classList.remove('flying-tile', 'disabled');
@@ -397,9 +442,12 @@ function onTileClick(id) {
 
     tileObj.el.addEventListener('transitionend', onTransitionEnd);
     
-    // Fallback in case event doesn't fire
+    // Safety fallback
     setTimeout(() => {
-        if (isAnimating) onTransitionEnd();
+        if (isAnimating && tileObj.el.parentElement === document.body) {
+             // If somehow stuck in fixed mode (rare)
+             onTransitionEnd();
+        }
     }, 500);
 }
 
@@ -423,6 +471,8 @@ function checkMatch() {
             toRemove.forEach(t => {
                 t.el.classList.add('match-anim');
             });
+            
+            playSound('match');
 
             // 2. Wait for animation then remove
             setTimeout(() => {
@@ -469,12 +519,14 @@ function checkWinLose() {
 function showModal(type) {
     modal.classList.remove('hidden');
     if (type === 'win') {
+        playSound('win');
         modalIcon.innerText = '🎉';
         modalTitle.innerText = '恭喜过关!';
         modalMsg.innerText = `第 ${currentLevel} 关挑战成功！`;
         modalBtn.innerText = '下一关';
         API.submitScore(username, currentLevel + 1); // Update score (passed level)
     } else {
+        playSound('lose');
         modalIcon.innerText = '😭';
         modalTitle.innerText = '游戏结束';
         modalMsg.innerText = '槽位已满，大侠请重新来过！';

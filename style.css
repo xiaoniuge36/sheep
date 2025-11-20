@@ -121,6 +121,14 @@ h1 {
     box-shadow: 0 0 0 #f9a825;
 }
 
+/* Music Button */
+.muted {
+    filter: grayscale(100%);
+    border-color: #999;
+    color: #999;
+    box-shadow: none;
+}
+
 .restart-btn {
     padding: 8px 18px;
     background: linear-gradient(to bottom, #4db6ac, #009688);
