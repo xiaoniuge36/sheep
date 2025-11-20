@@ -34,11 +34,11 @@ let username = localStorage.getItem('sheep_username');
 
 // Sound Management
 const audio = {
-    bgm: document.getElementById('bgm'),
-    click: document.getElementById('sfx-click'),
-    match: document.getElementById('sfx-match'),
-    win: document.getElementById('sfx-win'),
-    lose: document.getElementById('sfx-lose'),
+    bgm: null,
+    click: null,
+    match: null,
+    win: null,
+    lose: null,
     muted: false
 };
 
@@ -67,12 +67,19 @@ function toggleMusic() {
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     // Audio setup
-    audio.bgm.volume = 0.3;
-    document.getElementById('music-btn').addEventListener('click', toggleMusic);
+    audio.bgm = document.getElementById('bgm');
+    audio.click = document.getElementById('sfx-click');
+    audio.match = document.getElementById('sfx-match');
+    audio.win = document.getElementById('sfx-win');
+    audio.lose = document.getElementById('sfx-lose');
+
+    if (audio.bgm) audio.bgm.volume = 0.3;
+    const musicBtn = document.getElementById('music-btn');
+    if (musicBtn) musicBtn.addEventListener('click', toggleMusic);
     
     // Try auto-play BGM on first interaction
     document.body.addEventListener('click', () => {
-        if (!audio.muted && audio.bgm.paused) {
+        if (!audio.muted && audio.bgm && audio.bgm.paused) {
             audio.bgm.play().catch(() => {});
         }
     }, { once: true });
