@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>羊了个羊 - 极限挑战</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="bg-decoration">
+        <div class="cloud c1">☁️</div>
+        <div class="cloud c2">☁️</div>
+        <div class="grass"></div>
+    </div>
+
+    <div class="game-container">
+        <header>
+            <h1>🐑 羊了个羊 🐑</h1>
+            <div class="status-bar">
+                <span id="level-display">第 1 关</span>
+                <div class="header-controls">
+                    <button id="rank-btn" class="icon-btn" title="排行榜">🏆</button>
+                    <button id="restart-btn" class="restart-btn">
+                        <span class="btn-icon">🔄</span> 重来
+                    </button>
+                </div>
+            </div>
+        </header>
+        
+        <div id="game-board" class="board">
+            <!-- Tiles will be generated here -->
+        </div>
+
+        <div class="dock-container">
+            <div id="dock" class="dock">
+                <!-- Selected tiles go here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div id="login-modal" class="modal">
+        <div class="modal-content login-content">
+            <div class="modal-icon">👋</div>
+            <h2>欢迎大侠</h2>
+            <p class="login-tip">请留下您的尊姓大名</p>
+            <div class="input-wrapper">
+                <input type="text" id="username-input" placeholder="例如：喜羊羊" maxlength="8" autocomplete="off">
+                <span class="focus-border"></span>
+            </div>
+            <button id="login-btn" class="pulse-btn">开始挑战</button>
+        </div>
+    </div>
+
+    <!-- Leaderboard Modal -->
+    <div id="rank-modal" class="modal hidden">
+        <div class="modal-content rank-content">
+            <h2>🏆 英雄榜</h2>
+            <div class="rank-list" id="rank-list">
+                <!-- Rank items -->
+            </div>
+            <button id="close-rank-btn">关闭</button>
+        </div>
+    </div>
+
+    <div id="game-over-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-icon" id="modal-icon">😭</div>
+            <h2 id="modal-title">游戏结束</h2>
+            <p id="modal-message">槽位已满，大侠请重新来过！</p>
+            <button id="modal-action-btn">再试一次</button>
+        </div>
+    </div>
+
+    <!-- Effects Container -->
+    <div id="effects-layer"></div>
+
+    <script src="script.js"></script>
+</body>
+</html>
